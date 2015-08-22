@@ -1,14 +1,55 @@
 function getPlane()
 {
-	//var image = new Image();
-	var image = document.createElement("img");
+	var image = new Image(),
+		status = "airborne",
+		xStart = -102,
+		yStart = 200;
 	image.src = "assets/img/bomber.png";
+	
 	return {
 		xSpeed : 0.07,  //px per ms
 		ySpeed : 0.005,
-		xStart : -102,
-		yStart : 50,
-		img : image
+		xStart : xStart,
+		yStart : yStart,
+		x : xStart,
+		y : yStart,
+		img : image,
+		status : status,
+		move : function(timeDelta, canvas){
+		    if ((this.x) > canvas.width) {
+		        this.x = this.xStart;
+		    }
+		    if ((this.y + this.img.height) >= canvas.height){
+		    	this.status = "landed";
+		    }
+
+		    this.x += this.xSpeed * timeDelta;
+		    this.y += this.ySpeed * timeDelta;
+		},
+		hasCollided : function(buildings){
+			var noseX = Math.floor(this.x) + this.img.width,
+				noseY = Math.floor(this.y) + this.img.height - 6,
+				bellyX = Math.floor(this.x + this.img.width / 2),
+				bellyY = Math.floor(this.y) + this.img.height,
+				buildingNr = Math.floor(noseX / 30),
+				building = buildings[buildingNr];
+			//Check plane nose
+			if (building){
+				if (noseY > building.top){
+					return true;
+				}
+			}
+			//Check plane belly
+			buildingNr = Math.floor(bellyX / 30);
+			building = buildings[buildingNr];
+			if (building){
+				if (bellyY > building.top){
+					return true;
+				}
+			}
+
+			return false;
+		}
 	};
 }
 
@@ -18,6 +59,8 @@ function Building(xPos, yPos, nr){
 	this.nr = nr;
 	this.maxFloors = 8;
 	this.height = this.getHeight();
+	this.top = yPos;
+	this.status = "intact";
 }
 
 Building.prototype ={
@@ -43,6 +86,7 @@ Building.prototype ={
 			ctx.drawImage(img.shaft, this.x, this.y-4-20*indx);
 		}
 		ctx.drawImage(img.capital, this.x, this.y-7-20*(indx - 1));
+		this.top = this.y-7-20*(indx - 1);
 	},
 	getHeight : function(){
 		var canvasWidth = document.getElementById('canvas').width,
@@ -54,10 +98,9 @@ Building.prototype ={
 };
 
 
-function getBuildings()
+function getBuildings(canvas)
 {
-	var canvas = document.getElementById('canvas'),
-		buildings = [],
+	var buildings = [],
 		maxHeight,
 		maxWidth;
 
@@ -74,47 +117,46 @@ document.addEventListener("DOMContentLoaded", function(event)
 
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.oRequestAnimationFrame;
 
-	// get canvas and create drawing context
+	// initialize variables
 	var canvas = document.getElementById('canvas'),
 		context = canvas.getContext('2d'),
 		objects = {
 			plane: getPlane(),
-			buildings: getBuildings()
+			buildings: getBuildings(canvas)
 		},
-		stopPlane = false;
+		buildings,
+		plane;
 
-	function animate(nowTime, lastTime, xPos, yPos, objects) {
+	function animate(nowTime, lastTime, objects) {
 		
 		plane = objects.plane;
-	    if ((xPos) > canvas.width) {
-	        xPos = plane.xStart;
-	    }
-	    if ((yPos + plane.img.height) >= canvas.height){
-	    	stopPlane = true;
-	    }
-	    
-	    var timeDelta = nowTime - lastTime;
-	    var xDelta = plane.xSpeed * timeDelta;
-	    var yDelta = plane.ySpeed * timeDelta;
+	    buildings = objects.buildings;
+
+		//move plane
+		plane.move(nowTime - lastTime, canvas);
+		if (plane.hasCollided(buildings)){
+			console.log("plane crashed");
+			plane.status = "crashed";
+		}
 	    
 	    // clear canvas
 	    context.clearRect(0, 0, canvas.width, canvas.height);
 
 	    //draw objects
-	    for (var indx = 0; indx < objects.buildings.length; indx++)
+	    for (var indx = 0; indx < buildings.length; indx++)
 	    {
-	    	objects.buildings[indx].draw(context);
+	    	buildings[indx].draw(context);
 	    }
-	    context.drawImage(plane.img, xPos, yPos);
+	    context.drawImage(plane.img, plane.x, plane.y);
 		
-	    if (stopPlane !== true){
+	    if (plane.status === "airborne"){
 		    requestAnimationFrame(
 		        function(timestamp){
-		        	animate(timestamp, nowTime, xPos + xDelta, yPos + yDelta, objects);
+		        	animate(timestamp, nowTime, objects);
 		        }
 		    );
 		}
 	}
 
-	animate(0, 0, objects.plane.xStart, objects.plane.yStart, objects);
+	animate(0, 0, objects);
 });
