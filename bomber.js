@@ -1,9 +1,12 @@
+
+ 
+
 function getPlane()
 {
 	var image = new Image(),
 		status = "airborne",
 		xStart = -102,
-		yStart = 200;
+		yStart = 120;
 	image.src = "assets/img/bomber.png";
 	
 	return {
@@ -15,6 +18,9 @@ function getPlane()
 		y : yStart,
 		img : image,
 		status : status,
+		lastTimeBombDropped : 0,
+		nrOfBombsLeft : 10,
+		nrOfBombsDropped : 0,
 		move : function(timeDelta, canvas){
 		    if ((this.x) > canvas.width) {
 		        this.x = this.xStart;
@@ -25,6 +31,24 @@ function getPlane()
 
 		    this.x += this.xSpeed * timeDelta;
 		    this.y += this.ySpeed * timeDelta;
+		},
+		userActions : function(obj){
+  			if (Key.isDown(Key.SPACE)){
+  				var curTimeStamp = Math.floor(Date.now() / 100);
+  				//Check if not just dropped bomb (reload time)
+  				if (this.x > 0 && (this.x + this.img.width) < canvas.width && this.nrOfBombsLeft > 0 && curTimeStamp - this.lastTimeBombDropped > 6)
+  				{
+  					console.log("drop bomb (" + this.nrOfBombsLeft + " bombs left, " + this.nrOfBombsDropped + " dropped)");
+  					this.dropBomb(obj);
+  				}	
+  			}
+		},
+		dropBomb : function (obj){
+			this.nrOfBombsLeft--;
+			this.nrOfBombsDropped++;
+  			this.lastTimeBombDropped = Math.floor(Date.now() / 100);
+  			var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5);
+  			obj.bombs.push(bomb);
 		},
 		hasCollided : function(buildings){
 			var noseX = Math.floor(this.x) + this.img.width,
@@ -40,8 +64,8 @@ function getPlane()
 				}
 			}
 			//Check plane belly
-			buildingNr = Math.floor(bellyX / 30);
-			building = buildings[buildingNr];
+			//buildingNr = Math.floor(bellyX / 30);
+			building = buildings[Math.floor(bellyX / 30)];
 			if (building){
 				if (bellyY > building.top){
 					return true;
@@ -52,6 +76,40 @@ function getPlane()
 		}
 	};
 }
+
+function Bomb(xPos, yPos){
+	//position bomb in middle of building
+	this.x = Math.floor(xPos / 30) * 30 + 6;
+	this.y = yPos;
+	this.active = true;
+	this.imgHeight = 7;
+
+	this.img = new Image();
+	var thisBomb = this;
+	this.img.onload = function() {
+			thisBomb.imgHeight = this.height;
+		};
+	this.img.src = "assets/img/bomb.png";
+}
+
+Bomb.prototype = {
+	move : function(timeDelta, canvas){
+		if (!this.active) return;
+	    if ((this.y + this.imgHeight) <= canvas.height){
+	    	this.y++;
+	    }
+	    else {
+	    	this.remove();
+	    }
+	},
+	draw : function(ctx){
+		if (!this.active) return;
+		ctx.drawImage(this.img, this.x, this.y);
+	},
+	remove : function(){
+		this.active = false;
+	}
+};
 
 function Building(xPos, yPos, nr){
 	this.x = xPos;
@@ -91,9 +149,10 @@ Building.prototype ={
 	getHeight : function(){
 		var canvasWidth = document.getElementById('canvas').width,
 			divider = (canvasWidth / 2) / this.maxFloors,
-			maxHeight = this.maxFloors - Math.trunc(Math.abs((this.x - canvasWidth/2) / divider));
+			maxHeight = this.maxFloors - Math.floor(Math.abs((this.x - canvasWidth/2) / divider)),
+			minHeight = Math.floor(maxHeight / 4) + 1;
 
-		return Math.floor((Math.random() * maxHeight) + 1);
+		return Math.floor(Math.random() * maxHeight + minHeight);
 	}
 };
 
@@ -112,6 +171,39 @@ function getBuildings(canvas)
 	return buildings;
 }
 
+var Key = {
+  pressed: {},
+
+  SPACE: 32,
+  
+  isDown: function(keyCode) {
+    return this.pressed[keyCode];
+  },
+  
+  onKeydown: function(event) {
+   this.pressed[event.keyCode] = true;
+  },
+  
+  onKeyup: function(event) {
+    delete this.pressed[event.keyCode];
+  }
+};
+
+function Timer () {
+  this.elapsed = 0;
+  this.last = null;
+}
+ 
+Timer.prototype = {
+  tick: function (now) {
+    this.elapsed = (now - (this.last || now)) / 1000;
+    this.last = now;
+  },
+  fps: function () {
+    return Math.round(1 / this.elapsed);
+  }
+};
+
 document.addEventListener("DOMContentLoaded", function(event)
 { 
 
@@ -122,15 +214,25 @@ document.addEventListener("DOMContentLoaded", function(event)
 		context = canvas.getContext('2d'),
 		objects = {
 			plane: getPlane(),
-			buildings: getBuildings(canvas)
+			buildings: getBuildings(canvas),
+			bombs : []
 		},
 		buildings,
-		plane;
+		plane,
+		indx = 0,
+		timer = new Timer(),
+		fps = document.getElementById('fps');
 
 	function animate(nowTime, lastTime, objects) {
 		
 		plane = objects.plane;
+		bombs = objects.bombs;
 	    buildings = objects.buildings;
+
+	    //show FPS
+		timer.tick(Date.now());
+		fps.innerHTML = timer.fps();
+
 
 		//move plane
 		plane.move(nowTime - lastTime, canvas);
@@ -138,15 +240,25 @@ document.addEventListener("DOMContentLoaded", function(event)
 			console.log("plane crashed");
 			plane.status = "crashed";
 		}
+		plane.userActions(objects);
 	    
+		//move bombs
+		for (indx = 0; indx < bombs.length; indx++){
+			bombs[indx].move(nowTime - lastTime, canvas);
+		}
+
 	    // clear canvas
 	    context.clearRect(0, 0, canvas.width, canvas.height);
 
 	    //draw objects
-	    for (var indx = 0; indx < buildings.length; indx++)
+	    for (indx = 0; indx < buildings.length; indx++)
 	    {
 	    	buildings[indx].draw(context);
 	    }
+
+		for (indx = 0; indx < bombs.length; indx++){
+			bombs[indx].draw(context);
+		}
 	    context.drawImage(plane.img, plane.x, plane.y);
 		
 	    if (plane.status === "airborne"){
@@ -158,5 +270,10 @@ document.addEventListener("DOMContentLoaded", function(event)
 		}
 	}
 
+
 	animate(0, 0, objects);
+
+	window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
+	window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
+	
 });
