@@ -3,6 +3,7 @@ var kmBomber = {
 	images : {
 		plane : "bomber.png",
 		bomb : "bomb.png",
+		bombvert : "bombv.png",
 		building : {
 			_1 : {
 				base : "building1_base.png",
@@ -22,15 +23,17 @@ kmBomber.init = function() {
 		buildings: getBuildings(kmBomber.canvas),
 		bombs : []
 	};
+	kmBomber.hud = new HUD();
 	kmBomber.timer = new Timer();
 	kmBomber.fps = document.getElementById('fps');
 	kmBomber.player = new Player();
+	kmBomber.hud.init();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 	kmBomber.run();
 };
 
-kmBomber.run = (function(nowTime, lastTime) {
+kmBomber.run = function(nowTime, lastTime) {
 		
 	plane = kmBomber.objects.plane;
 	bombs = kmBomber.objects.bombs;
@@ -60,7 +63,7 @@ kmBomber.run = (function(nowTime, lastTime) {
 	}
 
     // clear canvas
-    context.clearRect(0, plane.y - 1, canvas.width, canvas.height);
+    context.clearRect(0, plane.y - 2, canvas.width, canvas.height);
 
     //draw objects
     for (indx = 0; indx < buildings.length; indx++)
@@ -80,7 +83,7 @@ kmBomber.run = (function(nowTime, lastTime) {
 	        }
 	    );
 	}
-});
+};
 
 
 
@@ -88,6 +91,8 @@ function Player(){
 	this.name = '';
 	this.hiScore = 0;
 	this.timesPlayed = 0;
+	this.level = 1;
+	this.score = 0;
 }
 
 Player.prototype.update = function(obj) {
@@ -96,12 +101,50 @@ Player.prototype.update = function(obj) {
 	}
 };
 
+function HUD(){
+	this.display = true;
+    this.canvas = document.getElementById("hud");
+	this.context = this.canvas.getContext("2d");
+	this.bombImg = new Image();
+	this.bombImg.src = kmBomber.imagePath + kmBomber.images.bombvert;
+	this.bombRange = {x: 410, y:60, w:200, h:40};
+	this.bombsPerRow = 20;
+	this.scoreRange = {x: 494, y:10, w:200, h:50};
+}
+
+HUD.prototype.init = function(){
+	this.context.font = "26px Verdana";
+	this.context.textBaseline = "top";
+	this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
+	this.updateBombs(kmBomber.objects.plane);
+	this.updateScore(kmBomber.player);
+};
+
+
+HUD.prototype.updateBombs = function(plane){
+	this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
+	for (var i = 0; i < plane.nrOfBombsLeft; i++){
+		this.context.drawImage(this.bombImg, this.bombRange.x + (i % this.bombsPerRow) * 9, this.bombRange.y + Math.floor(i / this.bombsPerRow) *20 );
+	}
+};
+
+HUD.prototype.updateScore = function(player){
+	this.context.clearRect(this.scoreRange.x, this.scoreRange.y, this.scoreRange.w, this.scoreRange.h);
+	this.context.fillText(this.pad(player.score.toString(), 6), this.scoreRange.x, this.scoreRange.y);
+};
+
+	var cnt = 0;
+
+HUD.prototype.pad = function(str, max) {
+  return str.length < max ? this.pad("0" + str, max) : str;
+};
+
 function getPlane()
 {
 	var image = new Image(),
 		status = "airborne",
 		xStart = -102,
-		yStart = 120;
+		yStart = 70;
 	image.src = kmBomber.imagePath + kmBomber.images.plane;
 	
 	return {
@@ -114,7 +157,7 @@ function getPlane()
 		img : image,
 		status : status,
 		lastTimeBombDropped : 0,
-		nrOfBombsLeft : 20,
+		nrOfBombsLeft : 40,
 		nrOfBombsDropped : 0,
 		move: function(timeDelta, canvas){
 		    if (this.x > canvas.width) {
@@ -135,7 +178,6 @@ function getPlane()
 				if(this.nrOfBombsLeft > 0 && curTimeStamp - this.lastTimeBombDropped > 6)
 				{
 					this.dropBomb(bombs);
-					console.log("drop bomb (" + this.nrOfBombsLeft + " bombs left, " + this.nrOfBombsDropped + " dropped)");
 				}
 			}
 		},
@@ -145,6 +187,7 @@ function getPlane()
   			this.lastTimeBombDropped = Math.floor(Date.now() / 100);
   			var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5, bombs.length);
   			bombs.push(bomb);
+  			kmBomber.hud.updateBombs(this);
 		},
 		hasCollided: function(buildings){
 			var noseX = Math.floor(this.x) + this.img.width,
@@ -278,8 +321,12 @@ Building.prototype ={
 			if (this.toDestroy > 0){
 				this.floors--;
 				this.toDestroy--;
+				kmBomber.player.score += 5;
+				kmBomber.hud.updateScore(kmBomber.player);
 				if (this.floors <= 0){
 					this.isDestroyed = true;
+					kmBomber.player.score += 3;
+					kmBomber.hud.updateScore(kmBomber.player);
 				}
 			} else {
 				bomb.remove();
@@ -339,12 +386,9 @@ kmBomber.imgLoader = function(imagePath, images, callback){
 	var failed = [];
 	var imgPath = imagePath;
 
-    getImageList(images);
+    objectToArr(images);
     processImages();
 
-	function getImageList(images){
-		objectToArr(images);
-	}
 	function processImages(){
 		processImage(list[0], 0);
 	}
@@ -390,7 +434,7 @@ document.addEventListener("DOMContentLoaded", function(event)
 	window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 	window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
-	kmBomber.imgLoader(kmBomber.imagePath, kmBomber.images, function(){
+	kmBomber.imgLoader(kmBomber.imagePath, kmBomber.images, function (){
 		kmBomber.init();
 	});
 });
