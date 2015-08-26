@@ -1,6 +1,6 @@
 var kmBomber = {
-	imagePath :"assets/img/",
-	images : {
+	imagePath: "assets/img/",
+	images: {
 		plane : "bomber.png",
 		bomb : "bomb.png",
 		bombvert : "bombv.png",
@@ -12,6 +12,10 @@ var kmBomber = {
 				broken : "building1_broken.png"
 			}
 		}
+	},
+	soundPath: 'assets/sound/',
+	tracks: {
+		explosion : "explosion.wav"
 	}
 };
 
@@ -30,6 +34,7 @@ kmBomber.init = function() {
 	kmBomber.hud.init();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
+	var expl = kmBomber.objects.buildings[0].sound().explosion;	
 	kmBomber.run();
 };
 
@@ -119,7 +124,6 @@ HUD.prototype.init = function(){
 	this.updateBombs(kmBomber.objects.plane);
 	this.updateScore(kmBomber.player);
 };
-
 
 HUD.prototype.updateBombs = function(plane){
 	this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
@@ -222,7 +226,7 @@ function Bomb(xPos, yPos, ID){
 	this.y = yPos;
 	this.active = true;
 	this.size = 1;//small bomb
-	this.impact = Math.floor(Math.random() * 3) + this.size; //#of floors it damages
+	this.impact = Math.floor(Math.random() * 3) + this.size + 1; //#of floors it damages
 	this.img = new Image();
 	var thisBomb = this;
 	this.img.src = kmBomber.imagePath + kmBomber.images.bomb;
@@ -281,8 +285,15 @@ Building.prototype ={
 			broken: broken
 		};
 	},
+	sound: function(){
+		var explosion = new Audio(kmBomber.soundPath + kmBomber.tracks.explosion);
+
+		return {
+			explosion: explosion
+		};
+	},
 	draw: function(ctx){
-		var img = this.img(this.nr);
+		var img = this.img();
 		if (this.floors > 0){
 			ctx.drawImage(img.base, this.x, this.y-4);
 		}
@@ -311,6 +322,9 @@ Building.prototype ={
 		return Math.floor(Math.random() * maxFloors + minFloors);
 	},
 	hit: function(bomb){
+		if (this.toDestroy > 0){ // buffers automatically when created
+			this.sound().explosion.play();
+		}
 		if (this.isIntact || this.bombId !== bomb.id){
 			this.bombId = bomb.id;
 			this.toDestroy = bomb.impact > this.floors ? this.floors : bomb.impact;
@@ -427,6 +441,45 @@ kmBomber.imgLoader = function(imagePath, images, callback){
 
 };
 
+kmBomber.soundLoader = function(soundPath, tracks, callback){
+	var list = [];
+	var completed = [];
+	var trackPath = soundPath;
+
+    objectToArr(tracks);
+    processTracks();
+
+	function processTracks(){
+		processTrack(list[0], 0);
+	}
+
+	function processTrack(track, indx){
+		var sound = new Audio(trackPath + track);
+
+		sound.oncanplay = function() {
+		    completed.push(trackPath + track);
+			if (completed.length >= list.length){
+				callback();
+			}
+		};
+	}
+	function objectToArr(obj) {
+	    for(var key in obj) {
+	    	if (typeof obj[key] === "string"){
+	    		list.push(obj[key]);
+	    	}
+	    }
+	}
+
+};
+
+
+/*
+	expl.canplay = function() {
+   		alert("Browser has loaded the current frame");
+		expl.play();
+	};
+*/
 
 document.addEventListener("DOMContentLoaded", function(event)
 { 
@@ -434,7 +487,9 @@ document.addEventListener("DOMContentLoaded", function(event)
 	window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 	window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
-	kmBomber.imgLoader(kmBomber.imagePath, kmBomber.images, function (){
-		kmBomber.init();
+	kmBomber.soundLoader(kmBomber.soundPath, kmBomber.tracks, function (){
+		kmBomber.imgLoader(kmBomber.imagePath, kmBomber.images, function (){
+			kmBomber.init();
+		});
 	});
 });
