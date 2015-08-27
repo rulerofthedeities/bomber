@@ -1,5 +1,5 @@
 var kmBomber = {
-	isDebug: true,
+	isDebug: false,
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -17,7 +17,8 @@ var kmBomber = {
 	soundPath: 'assets/sound/',
 	tracks: {
 		explosion : "explosion.wav"
-	}
+	},
+	level : 1
 };
 
 kmBomber.init = function() {
@@ -31,12 +32,15 @@ kmBomber.init = function() {
 	kmBomber.hud = new HUD();
 	kmBomber.timer = new Timer();
 	kmBomber.player = new Player();
-	kmBomber.menu(function(){kmBomber.start();});
+	kmBomber.menu(function(){
+		var userData = kmBomber.player.load();
+		kmBomber.start();
+	});
 	
 };
 
 kmBomber.menu = function(callback){
-	console.log("loading menu");
+	kmBomber.log("loading menu");
 	var menuPlane = new Plane(-102, 40);
 	menuPlane.ySpeed = 0;
 	menuPlane.y = 20;
@@ -84,7 +88,7 @@ kmBomber.start = function(){
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 
-	console.log("game starts");
+	kmBomber.log("game starts");
 	kmBomber.started = true;
 	kmBomber.run(Date.now, Date.now, function(){
 		kmBomber.isRunning = true;
@@ -110,7 +114,7 @@ kmBomber.run = function(nowTime, lastTime, callback) {
 	//move plane
 	plane.move(nowTime - lastTime, canvas);
 	if (plane.hasCollided(buildings)){
-		console.log("plane crashed");
+		kmBomber.log("plane crashed");
 		plane.status = "crashed";
 		callback();
 	}
@@ -148,25 +152,43 @@ kmBomber.run = function(nowTime, lastTime, callback) {
 };
 
 kmBomber.gameOver = function(){
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    console.log("game over");
-    context.font = "52px Verdana";
-	context.textBaseline = "top";
-	this.context.fillText("Game Over", 100, 200);
+    kmBomber.log("game over");
+    var el = document.getElementById("gameOver");
+    el.style.display = "block";
+    kmBomber.player.save();
 };
 
 
 function Player(){
-	//this.name = '';
-	//this.hiScore = 0;
-	//this.timesPlayed = 0;
+	this.name = '';
+	this.timesPlayed = 0;
+	this.hiScore = 0;
 	this.level = 1;
 	this.score = 0;
 }
 
-Player.prototype.update = function(obj) {
-	if (Key.isDown(Key.SPACE)){
-		obj.plane.tryBombDrop(obj.bombs);
+Player.prototype = {
+	update: function(obj) {
+		if (Key.isDown(Key.SPACE)){
+			obj.plane.tryBombDrop(obj.bombs);
+		}
+	},
+	load: function(){
+		var userData = localStorage.getItem(this.name);
+		userData = JSON.parse(userData);
+		if (userData){
+			this.timesPlayed = parseInt(userData.timesPlayed, 10) || 0;
+			this.hiScore = parseInt(userData.hiScore, 10) || 0;
+		}
+	},
+	save: function(){
+		var toSave = {
+			'name': this.name,
+			'hiScore': (this.score > this.hiScore ? this.score: this.hiScore) || 0,
+			'timesPlayed': (this.timesPlayed + 1) || 1
+		};
+		localStorage.setItem(this.name, JSON.stringify(toSave));
+
 	}
 };
 
@@ -178,7 +200,7 @@ function HUD(){
 	this.bombImg.src = kmBomber.imagePath + kmBomber.images.bombvert;
 	this.bombRange = {x: 410, y:60, w:200, h:40};
 	this.bombsPerRow = 20;
-	this.scoreRange = {x: 494, y:10, w:200, h:50};
+	this.scoreRange = {x: 494, y:10, w:200, h:30};
 }
 
 HUD.prototype = {
@@ -189,6 +211,10 @@ HUD.prototype = {
 		this.updateBombs(kmBomber.objects.plane);
 		this.updateScore(kmBomber.player);
 		this.updatePlayer(kmBomber.player);
+		this.updateLevel();
+		this.context.font = "14px Verdana";
+		this.context.fillText("High Score: ", this.bombRange.x, this.scoreRange.y + 30);
+		this.context.font = "26px Verdana";
 	},           
 	updateBombs: function(plane){
 		this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
@@ -200,9 +226,16 @@ HUD.prototype = {
 		this.context.clearRect(this.scoreRange.x, this.scoreRange.y, this.scoreRange.w, this.scoreRange.h);
 		this.context.fillText(this.pad(player.score.toString(), 6), this.scoreRange.x, this.scoreRange.y);
 	},
+	updateLevel: function(player){
+		this.context.clearRect(0, this.scoreRange.y + 30, 400, 100);
+		this.context.fillText("Level: " + kmBomber.level, 10, this.scoreRange.y + 30);
+	},
 	updatePlayer: function(player){
 		this.context.clearRect(0, 0, 400, 100);
 		this.context.fillText(player.name, 10, this.scoreRange.y);
+		this.context.font = "14px Verdana";
+		this.context.clearRect(this.scoreRange.x, this.scoreRange.y + 100, 200, 100);
+		this.context.fillText(this.pad(player.hiScore.toString(), 6), this.scoreRange.x, this.scoreRange.y + 30);
 	},
 	pad: function(str, max) {
   		return str.length < max ? this.pad("0" + str, max) : str;
@@ -480,7 +513,7 @@ kmBomber.imgLoader = function(imagePath, images, callback){
 		
 		image.onerror = function(){
 			failed.push(imgPath + imgSrc);
-			console.log("Error loading file '" + imgPath + imgSrc + "'");
+			kmBomber.log("Error loading file '" + imgPath + imgSrc + "'");
 			checkFinished();
         };
 		image.onload = function(){
@@ -539,6 +572,12 @@ kmBomber.soundLoader = function(soundPath, tracks, callback){
 	    }
 	}
 
+};
+
+kmBomber.log = function(msg){
+	if (!!kmBomber.isDebug){
+		console.log(msg);
+	}
 };
 
 
