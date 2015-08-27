@@ -1,4 +1,5 @@
 var kmBomber = {
+	isDebug: true,
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -23,22 +24,75 @@ kmBomber.init = function() {
     kmBomber.canvas = document.getElementById("canvas");
 	kmBomber.context = kmBomber.canvas.getContext("2d");
 	kmBomber.objects = {
-		plane: getPlane(),
+		plane: new Plane(-120, 70),
 		buildings: getBuildings(kmBomber.canvas),
 		bombs : []
 	};
 	kmBomber.hud = new HUD();
 	kmBomber.timer = new Timer();
-	kmBomber.fps = document.getElementById('fps');
 	kmBomber.player = new Player();
+	kmBomber.menu(function(){kmBomber.start();});
+	
+};
+
+kmBomber.menu = function(callback){
+	console.log("loading menu");
+	var menuPlane = new Plane(-102, 40);
+	menuPlane.ySpeed = 0;
+	menuPlane.y = 20;
+	kmBomber.menuRun(0, 0, menuPlane);
+
+	document.getElementById("start").addEventListener("click", function(){
+		var name = document.getElementById("name");
+		var nameStr = name.value;
+		var msg = "";
+		nameStr = nameStr.trim();
+		if (!nameStr.match(/^[\w\s]{3,10}$/)){
+			var err = document.getElementById("nameError");
+			if (nameStr.length < 3 || nameStr.length > 10){
+				msg = "The name must be 3-10 characters long";
+			} else  {
+				msg = "Only letters and numbers are allowed";
+			}
+			err.innerHTML = msg;
+			err.style.display= "block";
+			name.focus();
+		} else {
+			kmBomber.player.name = nameStr;
+			document.getElementById("menu").style.display = "none";
+			callback();
+		}
+	});
+};
+
+kmBomber.menuRun = function(nowTime, lastTime, plane){
+	plane.move(nowTime - lastTime, kmBomber.canvas);
+	kmBomber.context.clearRect(0,0,kmBomber.canvas.width, kmBomber.canvas.height);
+	if (kmBomber.started !== true)
+	{
+		kmBomber.context.drawImage(plane.img, plane.x, plane.y);
+		requestAnimationFrame(
+	        function(timestamp){
+	        	kmBomber.menuRun(timestamp, nowTime, plane);
+	        }
+	    );
+	} else {return;}
+};
+
+kmBomber.start = function(){
 	kmBomber.hud.init();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
-	var expl = kmBomber.objects.buildings[0].sound().explosion;	
-	kmBomber.run();
+
+	console.log("game starts");
+	kmBomber.started = true;
+	kmBomber.run(Date.now, Date.now, function(){
+		kmBomber.isRunning = true;
+		kmBomber.gameOver();
+	});
 };
 
-kmBomber.run = function(nowTime, lastTime) {
+kmBomber.run = function(nowTime, lastTime, callback) {
 		
 	plane = kmBomber.objects.plane;
 	bombs = kmBomber.objects.bombs;
@@ -47,14 +101,18 @@ kmBomber.run = function(nowTime, lastTime) {
     context = kmBomber.context;
 
     //show FPS
-	kmBomber.timer.tick(Date.now());
-	kmBomber.fps.innerHTML = kmBomber.timer.fps();
+    if (!!kmBomber.isDebug)
+    {
+		kmBomber.timer.tick(Date.now());
+		kmBomber.timer.display(kmBomber.timer.fps());
+	}
 
 	//move plane
 	plane.move(nowTime - lastTime, canvas);
 	if (plane.hasCollided(buildings)){
 		console.log("plane crashed");
 		plane.status = "crashed";
+		callback();
 	}
 	kmBomber.player.update(kmBomber.objects);//check if player presses keys
     
@@ -76,26 +134,32 @@ kmBomber.run = function(nowTime, lastTime) {
     	buildings[indx].draw(context);
     }
 
-	for (indx = 0; indx < bombs.length; indx++){
-		bombs[indx].draw(context);
-	}
-    context.drawImage(plane.img, plane.x, plane.y);
-	
     if (plane.status === "airborne"){
+		for (indx = 0; indx < bombs.length; indx++){
+			bombs[indx].draw(context);
+		}
+	    context.drawImage(plane.img, plane.x, plane.y);
 	    requestAnimationFrame(
 	        function(timestamp){
-	        	kmBomber.run(timestamp, nowTime);
+	        	kmBomber.run(timestamp, nowTime, callback);
 	        }
 	    );
-	}
+	} else { return; }
+};
+
+kmBomber.gameOver = function(){
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    console.log("game over");
+    context.font = "52px Verdana";
+	context.textBaseline = "top";
+	this.context.fillText("Game Over", 100, 200);
 };
 
 
-
 function Player(){
-	this.name = '';
-	this.hiScore = 0;
-	this.timesPlayed = 0;
+	//this.name = '';
+	//this.hiScore = 0;
+	//this.timesPlayed = 0;
 	this.level = 1;
 	this.score = 0;
 }
@@ -117,106 +181,105 @@ function HUD(){
 	this.scoreRange = {x: 494, y:10, w:200, h:50};
 }
 
-HUD.prototype.init = function(){
-	this.context.font = "26px Verdana";
-	this.context.textBaseline = "top";
-	this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
-	this.updateBombs(kmBomber.objects.plane);
-	this.updateScore(kmBomber.player);
+HUD.prototype = {
+	init: function(){
+		this.context.font = "26px Verdana";
+		this.context.textBaseline = "top";
+		this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
+		this.updateBombs(kmBomber.objects.plane);
+		this.updateScore(kmBomber.player);
+		this.updatePlayer(kmBomber.player);
+	},           
+	updateBombs: function(plane){
+		this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
+		for (var i = 0; i < plane.nrOfBombsLeft; i++){
+			this.context.drawImage(this.bombImg, this.bombRange.x + (i % this.bombsPerRow) * 9, this.bombRange.y + Math.floor(i / this.bombsPerRow) *20 );
+		}
+	},
+	updateScore: function(player){
+		this.context.clearRect(this.scoreRange.x, this.scoreRange.y, this.scoreRange.w, this.scoreRange.h);
+		this.context.fillText(this.pad(player.score.toString(), 6), this.scoreRange.x, this.scoreRange.y);
+	},
+	updatePlayer: function(player){
+		this.context.clearRect(0, 0, 400, 100);
+		this.context.fillText(player.name, 10, this.scoreRange.y);
+	},
+	pad: function(str, max) {
+  		return str.length < max ? this.pad("0" + str, max) : str;
+  	}
 };
 
-HUD.prototype.updateBombs = function(plane){
-	this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
-	for (var i = 0; i < plane.nrOfBombsLeft; i++){
-		this.context.drawImage(this.bombImg, this.bombRange.x + (i % this.bombsPerRow) * 9, this.bombRange.y + Math.floor(i / this.bombsPerRow) *20 );
+
+function Plane(posX, posY){
+	this.img = new Image();
+	this.status = "airborne";
+	this.xStart = posX || 0;
+	this.yStart = posY || 70;
+	this.xSpeed = 0.07;
+	this.ySpeed = 0.005;
+	this.x = posX;
+	this.y = posY;
+	this.img.src = kmBomber.imagePath + kmBomber.images.plane;
+	this.status = "airborne";
+	this.lastTimeBombDropped = 0;
+	this.nrOfBombsLeft = 40;
+	this.nrOfBombsDropped = 0;
+}
+
+Plane.prototype ={
+	move: function(timeDelta, canvas){
+	    if (this.x > canvas.width) {
+	        this.x = this.xStart;
+	    }
+	    if ((this.y + this.img.height) >= canvas.height){
+	    	this.status = "landed";
+	    }
+	    this.x += this.xSpeed * (timeDelta || 0);
+	    this.y += this.ySpeed * (timeDelta || 0);
+	},
+	tryBombDrop: function(bombs){
+		var curTimeStamp = Math.floor(Date.now() / 100);
+		//Check if plane in frame has reloaded
+		if (this.x > -this.img.width / 2 && (this.x + this.img.width / 2) < canvas.width)
+		{
+			//check if bomb has been loaded
+			if(this.nrOfBombsLeft > 0 && curTimeStamp - this.lastTimeBombDropped > 6)
+			{
+				this.dropBomb(bombs);
+			}
+		}
+	},
+	dropBomb: function (bombs){
+		this.nrOfBombsLeft--;
+		this.nrOfBombsDropped++;
+			this.lastTimeBombDropped = Math.floor(Date.now() / 100);
+			var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5, bombs.length);
+			bombs.push(bomb);
+			kmBomber.hud.updateBombs(this);
+	},
+	hasCollided: function(buildings){
+		var noseX = Math.floor(this.x) + this.img.width,
+			noseY = Math.floor(this.y) + this.img.height - 6,
+			bellyX = Math.floor(this.x + this.img.width / 2),
+			bellyY = Math.floor(this.y) + this.img.height,
+			building = buildings[Math.floor(noseX / 30)];
+		//Check plane nose
+		if (building){
+			if (noseY > building.top){
+				return true;
+			}
+		}
+		//Check plane belly
+		building = buildings[Math.floor(bellyX / 30)];
+		if (building){
+			if (bellyY > building.top){
+				return true;
+			}
+		}
+
+		return false;
 	}
 };
-
-HUD.prototype.updateScore = function(player){
-	this.context.clearRect(this.scoreRange.x, this.scoreRange.y, this.scoreRange.w, this.scoreRange.h);
-	this.context.fillText(this.pad(player.score.toString(), 6), this.scoreRange.x, this.scoreRange.y);
-};
-
-	var cnt = 0;
-
-HUD.prototype.pad = function(str, max) {
-  return str.length < max ? this.pad("0" + str, max) : str;
-};
-
-function getPlane()
-{
-	var image = new Image(),
-		status = "airborne",
-		xStart = -102,
-		yStart = 70;
-	image.src = kmBomber.imagePath + kmBomber.images.plane;
-	
-	return {
-		xSpeed : 0.07,  //px per ms
-		ySpeed : 0.005,
-		xStart : xStart,
-		yStart : yStart,
-		x : xStart,
-		y : yStart,
-		img : image,
-		status : status,
-		lastTimeBombDropped : 0,
-		nrOfBombsLeft : 40,
-		nrOfBombsDropped : 0,
-		move: function(timeDelta, canvas){
-		    if (this.x > canvas.width) {
-		        this.x = this.xStart;
-		    }
-		    if ((this.y + this.img.height) >= canvas.height){
-		    	this.status = "landed";
-		    }
-		    this.x += this.xSpeed * (timeDelta || 0);
-		    this.y += this.ySpeed * (timeDelta || 0);
-		},
-		tryBombDrop: function(bombs){
-			var curTimeStamp = Math.floor(Date.now() / 100);
-			//Check if plane in frame has reloaded
-			if (this.x > -this.img.width / 2 && (this.x + this.img.width / 2) < canvas.width)
-			{
-				//check if bomb has been loaded
-				if(this.nrOfBombsLeft > 0 && curTimeStamp - this.lastTimeBombDropped > 6)
-				{
-					this.dropBomb(bombs);
-				}
-			}
-		},
-		dropBomb: function (bombs){
-			this.nrOfBombsLeft--;
-			this.nrOfBombsDropped++;
-  			this.lastTimeBombDropped = Math.floor(Date.now() / 100);
-  			var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5, bombs.length);
-  			bombs.push(bomb);
-  			kmBomber.hud.updateBombs(this);
-		},
-		hasCollided: function(buildings){
-			var noseX = Math.floor(this.x) + this.img.width,
-				noseY = Math.floor(this.y) + this.img.height - 6,
-				bellyX = Math.floor(this.x + this.img.width / 2),
-				bellyY = Math.floor(this.y) + this.img.height,
-				building = buildings[Math.floor(noseX / 30)];
-			//Check plane nose
-			if (building){
-				if (noseY > building.top){
-					return true;
-				}
-			}
-			//Check plane belly
-			building = buildings[Math.floor(bellyX / 30)];
-			if (building){
-				if (bellyY > building.top){
-					return true;
-				}
-			}
-
-			return false;
-		}
-	};
-}
 
 function Bomb(xPos, yPos, ID){
 	//position bomb in middle of building
@@ -391,6 +454,11 @@ Timer.prototype = {
   },
   fps: function () {
     return Math.round(1 / this.elapsed);
+  },
+  display: function(fps){
+
+    context.clearRect(2, 2, 100, 100);
+	context.fillText(fps, 2, 10);
   }
 };
 
@@ -474,12 +542,6 @@ kmBomber.soundLoader = function(soundPath, tracks, callback){
 };
 
 
-/*
-	expl.canplay = function() {
-   		alert("Browser has loaded the current frame");
-		expl.play();
-	};
-*/
 
 document.addEventListener("DOMContentLoaded", function(event)
 { 
@@ -492,4 +554,5 @@ document.addEventListener("DOMContentLoaded", function(event)
 			kmBomber.init();
 		});
 	});
+
 });

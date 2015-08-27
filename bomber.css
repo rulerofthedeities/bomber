@@ -1,4 +1,8 @@
 
+body{
+	background-color: #eee;
+	font-family: Arial, Helvetica, sans-serif;
+}
 #sky{
 	position: relative;
 	width:600px;
@@ -6,9 +10,6 @@
 	background: linear-gradient(to bottom, hsla(199,84%,88%,1) 0%, hsla(9,87%,97%,1) 55%, hsla(7,88%,77%,1) 91%, hsla(5,79%,79%,1) 100%);
 	border:1px solid #aaa;
 	z-index: -3;
-}
-body{
-	background-color: #eee;
 }
 .sun{
 	width:100px;
@@ -32,4 +33,41 @@ body{
 	position:absolute;
 	top:0;
 	left:0;
+}
+.menu{
+	font-size:30px;
+	margin:0 auto;
+	position:absolute;
+	top:0;
+	left:0;
+	padding:100px 0 0 92px;
+	opacity: 0.8;
+}
+input{
+	font-size:26px;
+	border-radius: 6px;
+}
+input[type="button"]{
+	margin-top:10px;
+	padding:4px;
+	width:100%;
+}
+input[type="text"]{
+	width:300px;
+}
+.error{
+	display: none;
+	color:red;
+	font-size:14px;
+	text-align: right;
+	font-weight: bold;
+}
+#gameOver{
+	position:absolute;
+	top:100px;
+	left:0;
+	width:600px;
+	text-align: center;
+	font-size: 100px;
+	display: none;
 }
