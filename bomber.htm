@@ -6,18 +6,23 @@
 	<link href='http://fonts.googleapis.com/css?family=Iceland' rel='stylesheet' type='text/css'>
 </head>
 <body>
-	<form id="menu" class="menu">
+	<form id="startMenu" class="menu">
 		<label for="name" required>Name:</label>
-		<input type="text" id="name" placeholder="Enter your name"   maxlength="10"><br>
+		<input type="text" id="name" placeholder="Enter your name" maxlength="10" autofocus onkeypress="return startOnEnter(event, 'start');"><br>
 		<span class="error" id="nameError">test</span>
 		<input type="button" id="start" value="Start">
+	</form>	
+	<form id="levelMenu" class="menu">
+		<div id="congrats">Congratulations!</div>
+		<div id="congrats2" class="congrats">Level <span id="level"></span> completed</div>
+		<div id="congrats3" class="congrats">You have been promoted to <div id="rank"></div></div>
+		<input type="button" id="nxtLevel" value="Start">
 	</form>
-	<div id="gameOver">Game Over</div>
+	<div id="gameOver">GAME OVER</div>
 	<div id="sky">
 		<canvas id="canvas" width="600px" height="400px"></canvas>
 		<canvas id="hud" width="600px" height="100px"></canvas>
-		<div id="sun1" class="sun"></div>
-		<div id="sun2" class="sun"></div>
+		<div id="sun"></div>
 	</div>
 </body>
 </html>
