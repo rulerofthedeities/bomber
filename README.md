@@ -1,10 +1,22 @@
-# bomber
+# km-Bomber
 Old school bomber game in JS
 
-Press space to drop a bomb
+##installation
+Download the ZIP file and expand its contents into a folder.
+Launch the bomber.htm file in a browser.
 
+##requirements
+You'll need a html5-compliant browser to run the game.
+The latest versions of Chrome, Firefox, Opera and Yandex are all compliant.
 
-Attribution:
+##instructions
+Press space to drop a bomb.
+Destroy all buildings to complete a level.
+
+##Screenshot
+![kmBomber sreenshot](http://imgur.com/KwAna3i)
+
+##Attribution
  - cheer sound: http://www.freesound.org/people/chripei/
  - rocket sound: http://www.freesound.org/people/Robinhood76/
  

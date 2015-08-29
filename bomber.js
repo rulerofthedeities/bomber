@@ -1,6 +1,7 @@
+
 var kmBomber = {
 	isDebug: true,
-	version: "1.0.0",
+	version: "1.0.1",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -109,7 +110,7 @@ kmBomber.levelMenu = function(status, callback){
 		var rank = kmBomber.ranks[kmBomber.player.rank].toLowerCase();
 		var img = "<img src='" + kmBomber.imagePath + kmBomber.images.rank[rank] + "'>";
 		document.getElementById("rank").innerHTML = kmBomber.ranks[kmBomber.player.rank] + img;
-		document.getElementById("congrats").style.display = "block";
+
 		document.getElementById("congratsPromo").style.display = "block";
 	} else {
 		document.getElementById("congratsPromo").style.display = "none";
@@ -127,6 +128,7 @@ kmBomber.levelMenu = function(status, callback){
 		document.getElementById("nxtLevel").value = "Restart";
 		document.getElementById("nxtLevel").style.top = "120px";
 	} else	{
+		document.getElementById("congrats").style.display = "block";
 		document.getElementById("level").innerHTML = kmBomber.level;
 		document.getElementById("nxtLevel").value = "Start level " + (kmBomber.level + 1);
 		document.getElementById("congratsLevel").style.display = "block";
@@ -146,6 +148,7 @@ kmBomber.levelMenu = function(status, callback){
 
 kmBomber.start = function(){
 	kmBomber.hud.init();
+	kmBomber.hud.updateLabels();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 
@@ -153,7 +156,6 @@ kmBomber.start = function(){
 	kmBomber.started = true;
 
 	kmBomber.run(Date.now, Date.now);
-	
 };
 
 kmBomber.restart = function(){
@@ -279,7 +281,7 @@ Player.prototype = {
 	save: function(){
 		var toSave = {
 			'name': this.name,
-			'hiScore': (this.score > this.hiScore ? this.score: this.hiScore) || 0,
+			'hiScore': this.getHiScore(),
 			'timesPlayed': (this.timesPlayed + 1) || 1,
 			'rank': this.rank
 		};
@@ -292,7 +294,6 @@ Player.prototype = {
 		this.score+= Math.pow(kmBomber.level, 2) * 200;
 		//Bonus score for remaining bombs
 		//...
-
 		kmBomber.hud.updateScore(this);
 		this.checkPromotion();
 		if (kmBomber.level < kmBomber.maxLevels){
@@ -312,6 +313,9 @@ Player.prototype = {
 			this.completedGame();
 		}
 	},
+	getHiScore: function(){
+		return (this.score > this.hiScore ? this.score: this.hiScore) || 0;
+	},
 	checkPromotion: function(){
 		this.isPromoted = false;
 		if (this.rank < kmBomber.level){
@@ -327,8 +331,9 @@ Player.prototype = {
 	gameOver : function(){
 	    kmBomber.log("game over");
 	    this.save();
+		this.hiScore = this.getHiScore();
 		kmBomber.levelMenu("gameover", function(){
-			kmBomber.log('Restart');
+			kmBomber.log('Restart'); 
 			kmBomber.restart();
 		});
 
@@ -354,21 +359,23 @@ function HUD(){
 	this.bombRange = {x: 410, y:60, w:200, h:40};
 	this.bombsPerRow = 20;
 	this.scoreRange = {x: 494, y:10, w:200, h:30};
+	this.context.textBaseline = "top";
 }
 
 HUD.prototype = {
 	init: function(){
-		this.context.textBaseline = "top";
-		this.context.font = "26px Verdana";
-		this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
 		this.updateBombs(kmBomber.objects.plane);
 		this.updateScore(kmBomber.player);
 		this.updatePlayer(kmBomber.player);
 		this.updateRank(kmBomber.player);
 		this.updateLevel();
+	},
+	updateLabels: function(){
+		this.context.font = "26px Verdana";
+		this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
 		this.context.font = "14px Verdana";
 		this.context.fillText("High Score: ", this.bombRange.x, this.scoreRange.y + 30);
-	},           
+	},  
 	updateBombs: function(plane){
 		this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
 		for (var i = 0; i < plane.nrOfBombsLeft; i++){
@@ -391,7 +398,7 @@ HUD.prototype = {
 		this.context.fillText(player.name, 10, this.scoreRange.y);
 		//player high score
 		this.context.font = "14px Verdana";
-		this.context.clearRect(this.scoreRange.x, this.scoreRange.y + 100, 200, 100);
+		this.context.clearRect(this.scoreRange.x, this.scoreRange.y + 30, 200, 20);
 		this.context.fillText(this.pad(player.hiScore.toString(), 6), this.scoreRange.x, this.scoreRange.y + 30);
 	},
 	updateRank: function(player){
