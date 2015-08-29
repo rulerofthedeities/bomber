@@ -35,7 +35,7 @@ body{
 	top:0;
 	left:0;
 	padding:0 0 0 0;
-	opacity: 0.8;
+	opacity: 0.9;
 }
 #levelMenu{
 	margin-top:140px;
@@ -47,6 +47,7 @@ body{
 	font-size: 26px;
 }
 #nxtLevel{
+	position:relative;
 	margin-top:12px;
 }
 #congrats{

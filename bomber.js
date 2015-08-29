@@ -1,5 +1,6 @@
 var kmBomber = {
-	isDebug: false,
+	isDebug: true,
+	version: "1.0.0",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -17,6 +18,7 @@ var kmBomber = {
 			airman: "rank_airman.png",
 			sergeant: "rank_sergeant.png",
 			lieutenant: "rank_lieutenant.png",
+			captain: "rank_captain.png",
 			major: "rank_major.png",
 			colonel: "rank_colonel.png",
 			general: "rank_general.png"
@@ -36,7 +38,7 @@ var kmBomber = {
 };
 
 kmBomber.init = function() {
-	//kmBomber.sun = document.getElementById("sun");
+	kmBomber.log("km-Bomber version " + kmBomber.version);
     kmBomber.canvas = document.getElementById("canvas");
 	kmBomber.context = kmBomber.canvas.getContext("2d");
 	kmBomber.objects = {
@@ -54,19 +56,6 @@ kmBomber.init = function() {
 	
 };
 
-kmBomber.initLevel = function(level){
-	kmBomber.objects.plane.init(level, kmBomber.planeStart.x, kmBomber.planeStart.y);
-	kmBomber.hud.init();
-	kmBomber.player.isPromoted = false;
-	kmBomber.objects.buildings = getBuildings(level);
-	kmBomber.objects.bombs = [];
-	kmBomber.timer = new Timer();
-	kmBomber.started = true;
-	
-	kmBomber.run(Date.now, Date.now);
-	
-};
-
 kmBomber.startMenu = function(callback){
 	kmBomber.log("loading menu");
 	var menuPlane = new Plane(-102, 40);
@@ -75,7 +64,8 @@ kmBomber.startMenu = function(callback){
 	kmBomber.plane = menuPlane;
 	kmBomber.runMenu();
 
-	document.getElementById("start").addEventListener("click", function(){
+	document.getElementById("start").addEventListener("click", function(e){
+		e.preventDefault();
 		var name = document.getElementById("name");
 		var nameStr = name.value;
 		var msg = "";
@@ -112,24 +102,42 @@ kmBomber.runMenu = function() {
 	} 
 };
 
-kmBomber.levelMenu = function(callback){
+kmBomber.levelMenu = function(status, callback){
 	kmBomber.log("loading level menu");
+
 	if (kmBomber.player.isPromoted === true){
 		var rank = kmBomber.ranks[kmBomber.player.rank].toLowerCase();
 		var img = "<img src='" + kmBomber.imagePath + kmBomber.images.rank[rank] + "'>";
 		document.getElementById("rank").innerHTML = kmBomber.ranks[kmBomber.player.rank] + img;
-		document.getElementById("congrats3").style.display = "block";
+		document.getElementById("congrats").style.display = "block";
+		document.getElementById("congratsPromo").style.display = "block";
+	} else {
+		document.getElementById("congratsPromo").style.display = "none";
 	}
-	document.getElementById("level").innerHTML = kmBomber.level;
-	document.getElementById("nxtLevel").value = "Start level " + (kmBomber.level + 1);
-	document.getElementById("congrats2").style.display = "block";
+	if (status === "gamecomplete"){
+		document.getElementById("congrats").innerHTML = "Victory!";
+		document.getElementById("congratsLevel").style.display = "none";
+		document.getElementById("nxtLevel").value = "Restart";
+	} else if(status === "gameover") {
+		document.getElementById("congrats").style.display = "none";
+		document.getElementById("congratsLevel").style.display = "none";
+		document.getElementById("congratsPromo").style.display = "none";
+		document.getElementById("gameOver").style.display = "block";
+	    document.getElementById("sky").style.opacity = "0.5";
+		document.getElementById("nxtLevel").value = "Restart";
+		document.getElementById("nxtLevel").style.top = "120px";
+	} else	{
+		document.getElementById("level").innerHTML = kmBomber.level;
+		document.getElementById("nxtLevel").value = "Start level " + (kmBomber.level + 1);
+		document.getElementById("congratsLevel").style.display = "block";
+	}
 	document.getElementById("levelMenu").style.display = "block";
-
 	document.getElementById("nxtLevel").addEventListener("click", function(e){
+		e.preventDefault();
 		document.getElementById("nxtLevel").removeEventListener(e.type, arguments.callee);
-		document.getElementById("congrats2").style.display = "none";
-		document.getElementById("congrats3").style.display = "none";
 		document.getElementById("levelMenu").style.display = "none";
+		document.getElementById("gameOver").style.display = "none";
+	    document.getElementById("sky").style.opacity = "1.0";
 		callback();
 	});
 
@@ -144,6 +152,25 @@ kmBomber.start = function(){
 	kmBomber.log("game starts");
 	kmBomber.started = true;
 
+	kmBomber.run(Date.now, Date.now);
+	
+};
+
+kmBomber.restart = function(){
+	kmBomber.level = 1;
+	kmBomber.player.score = 0;
+	kmBomber.startLevel(kmBomber.level);
+};
+
+kmBomber.startLevel = function(level){
+	kmBomber.objects.plane.init(level, kmBomber.planeStart.x, kmBomber.planeStart.y);
+	kmBomber.hud.init();
+	kmBomber.canvas.setAttribute('tabindex','0');
+	kmBomber.canvas.focus();
+	kmBomber.player.isPromoted = false;
+	kmBomber.objects.buildings = getBuildings(level);
+	kmBomber.objects.bombs = [];
+	
 	kmBomber.run(Date.now, Date.now);
 	
 };
@@ -210,12 +237,10 @@ kmBomber.run = function(nowTime, lastTime) {
 };
 
 
-
-
 /*
 kmBomber.setSun = function(){
 	if (!!kmBomber.started){
-		var obj = kmBomber.sun;
+		var obj = document.getElementById("sun");
 		obj.style.right = ((parseInt(obj.style.right, 10) || 40) - 1) + "px";
 	    obj.style.bottom = ((parseInt(obj.style.right, 10) || 160) - 2) + "px";
 	}
@@ -224,6 +249,7 @@ kmBomber.setSun = function(){
 	}
 };
 */
+
 
 function Player(){
 	this.name = '';
@@ -271,11 +297,10 @@ Player.prototype = {
 		this.checkPromotion();
 		if (kmBomber.level < kmBomber.maxLevels){
 
-			kmBomber.levelMenu(function(){
+			kmBomber.levelMenu("levelcomplete", function(){
 				kmBomber.level++;
 				kmBomber.log('Start level ' + kmBomber.level);
-				kmBomber.initLevel(kmBomber.level);
-				//kmBomber.start();
+				kmBomber.startLevel(kmBomber.level);
 			});
 		} else {
 			setTimeout(function(){ 
@@ -288,24 +313,35 @@ Player.prototype = {
 		}
 	},
 	checkPromotion: function(){
-		if (this.rank <= kmBomber.level){
+		this.isPromoted = false;
+		if (this.rank < kmBomber.level){
 			this.rank = kmBomber.level;
 			this.isPromoted = true;
+		} else {
+			if (kmBomber.level === kmBomber.maxLevels && this.rank < kmBomber.ranks.length - 1){
+				this.rank++;
+				this.isPromoted = true;
+			}
 		}
 	},
 	gameOver : function(){
 	    kmBomber.log("game over");
 	    this.save();
-
-	    var el = document.getElementById("gameOver");
-	    el.style.display = "block";
-	    el = document.getElementById("sky");
-	    el.style.opacity = "0.5";
+		kmBomber.levelMenu("gameover", function(){
+			kmBomber.log('Restart');
+			kmBomber.restart();
+		});
 
 	},
 	completedGame: function(){
 		kmBomber.log("game completed");
 	    this.save();
+
+
+		kmBomber.levelMenu("gamecomplete", function(){
+			kmBomber.log('Restart');
+			kmBomber.restart();
+		});
 	}
 };
 
@@ -322,8 +358,8 @@ function HUD(){
 
 HUD.prototype = {
 	init: function(){
-		this.context.font = "26px Verdana";
 		this.context.textBaseline = "top";
+		this.context.font = "26px Verdana";
 		this.context.fillText("Score: ", this.bombRange.x, this.scoreRange.y);
 		this.updateBombs(kmBomber.objects.plane);
 		this.updateScore(kmBomber.player);
@@ -332,7 +368,6 @@ HUD.prototype = {
 		this.updateLevel();
 		this.context.font = "14px Verdana";
 		this.context.fillText("High Score: ", this.bombRange.x, this.scoreRange.y + 30);
-		this.context.font = "26px Verdana";
 	},           
 	updateBombs: function(plane){
 		this.context.clearRect(this.bombRange.x, this.bombRange.y, this.bombRange.w, this.bombRange.h);
@@ -341,6 +376,7 @@ HUD.prototype = {
 		}
 	},
 	updateScore: function(player){
+		this.context.font = "26px Verdana";
 		this.context.clearRect(this.scoreRange.x, this.scoreRange.y, this.scoreRange.w, this.scoreRange.h);
 		this.context.fillText(this.pad(player.score.toString(), 6), this.scoreRange.x, this.scoreRange.y);
 	},
@@ -350,6 +386,7 @@ HUD.prototype = {
 		this.context.fillText("Level: " + kmBomber.level, 10, this.scoreRange.y + 30);
 	},
 	updatePlayer: function(player){
+		this.context.font = "26px Verdana";
 		this.context.clearRect(0, 0, 400, 100);
 		this.context.fillText(player.name, 10, this.scoreRange.y);
 		//player high score
@@ -553,6 +590,7 @@ Building.prototype ={
 			maxFloors = this.maxFloors - Math.floor(Math.abs((this.x - canvasWidth/2) / divider)),
 			minFloors = Math.floor(this.maxFloors / 6) + (kmBomber.level - 1);
 
+
 		return Math.floor(Math.random() * maxFloors + minFloors);
 	},
 	hit: function(bomb){
@@ -636,7 +674,7 @@ Timer.prototype = {
 		return Math.round(1 / this.elapsed);
 	},
 	display: function(fps){
-		context.clearRect(2, 2, 100, 100);
+		context.clearRect(2, 2, 50, 50);
 		context.fillText(fps, 2, 10);
 	}
 };
