@@ -14,7 +14,7 @@ Press space to drop a bomb.
 Destroy all buildings to complete a level.
 
 ##Screenshot
-![kmBomber sreenshot](http://imgur.com/KwAna3i)
+![km-Bomber sreenshot](http://i.imgur.com/KwAna3i.png)
 
 ##Attribution
  - cheer sound: http://www.freesound.org/people/chripei/
