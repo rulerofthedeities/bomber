@@ -1,7 +1,8 @@
 'use strict';
+    
 var kmBomber = {
 	isDebug: true,
-	version: "1.0.2",
+	version: "1.1.0",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -44,7 +45,7 @@ kmBomber.init = function() {
 	kmBomber.context = kmBomber.canvas.getContext("2d");
 	kmBomber.objects = {
 		plane: new Plane(kmBomber.planeStart.x, kmBomber.planeStart.y),
-		buildings: getBuildings(1),
+		buildings: new Buildings(),
 		bombs : []
 	};
 	kmBomber.hud = new HUD();
@@ -95,12 +96,13 @@ kmBomber.runMenu = function() {
  
     kmBomber.time = now;
     kmBomber.plane.move(dt, kmBomber.canvas);
-	kmBomber.context.clearRect(0,0,kmBomber.canvas.width, kmBomber.canvas.height);
 	if (kmBomber.started !== true)
 	{
-		kmBomber.context.drawImage(kmBomber.plane.img, kmBomber.plane.x, kmBomber.plane.y);
+		kmBomber.plane.draw();
     	requestAnimationFrame(kmBomber.runMenu);
-	} 
+	} else {
+		kmBomber.plane.clear();
+	}
 };
 
 kmBomber.levelMenu = function(status, callback){
@@ -147,14 +149,15 @@ kmBomber.levelMenu = function(status, callback){
 };
 
 kmBomber.start = function(){
+	kmBomber.started = true;
 	kmBomber.hud.init();
 	kmBomber.hud.updateLabels();
+	kmBomber.objects.buildings.draw();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 
 	kmBomber.log("game starts");
-	kmBomber.started = true;
-
+	
 	kmBomber.run();
 };
 
@@ -165,14 +168,17 @@ kmBomber.restart = function(){
 };
 
 kmBomber.startLevel = function(level){
+	kmBomber.context.clearRect(0, kmBomber.planeStart.y, canvas.width, canvas.height);
 	kmBomber.objects.plane.init(level, kmBomber.planeStart.x, kmBomber.planeStart.y);
 	kmBomber.hud.init();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 	kmBomber.player.isPromoted = false;
-	kmBomber.objects.buildings = getBuildings(level);
+	kmBomber.objects.buildings = new Buildings();
 	kmBomber.objects.bombs = [];
+	kmBomber.objects.buildings.draw();
 	kmBomber.time = null;
+
 	
 	kmBomber.run();
 };
@@ -199,7 +205,7 @@ kmBomber.run = function() {
 
 	//move plane
 	plane.move(dt, canvas);
-	if (plane.hasCollided(buildings)){
+	if (plane.hasCollided(buildings.building)){
 		kmBomber.log("plane crashed");
 		plane.status = "crashed";
 		kmBomber.player.gameOver();
@@ -210,26 +216,17 @@ kmBomber.run = function() {
 	//move bombs
 	for (indx = 0; indx < bombs.length; indx++){
 		if (bombs[indx].move(dt, canvas)){
-			if (bombs[indx].hasCollided(buildings[bombs[indx].buildingNr])){
-				buildings[bombs[indx].buildingNr].hit(bombs[indx]);
+			if (bombs[indx].hasCollided(buildings.building[bombs[indx].buildingNr])){
+				buildings.building[bombs[indx].buildingNr].hit(bombs[indx]);
 			}
 		}
 	}
 
-    // clear canvas
-    context.clearRect(0, plane.y - 2, canvas.width, canvas.height);
-
-    //draw objects
-    for (indx = 0; indx < buildings.length; indx++)
-    {
-    	buildings[indx].draw(context);
-    }
-
     if (plane.status !== "crashed"){
-	    context.drawImage(plane.img, plane.x, plane.y);
+    	plane.draw();
 	    if (plane.status !== "landed"){
 			for (indx = 0; indx < bombs.length; indx++){
-				bombs[indx].draw(context);
+				bombs[indx].draw();
 			}
 		    requestAnimationFrame(kmBomber.run);
 		} else {
@@ -238,21 +235,6 @@ kmBomber.run = function() {
 	    }
 	}
 };
-
-
-/*
-kmBomber.setSun = function(){
-	if (!!kmBomber.started){
-		var obj = document.getElementById("sun");
-		obj.style.right = ((parseInt(obj.style.right, 10) || 40) - 1) + "px";
-	    obj.style.bottom = ((parseInt(obj.style.right, 10) || 160) - 2) + "px";
-	}
-	if (kmBomber.finished){
-		clearInterval(intervalId);
-	}
-};
-*/
-
 
 function Player(){
 	this.name = '';
@@ -425,6 +407,8 @@ function Plane(posX, posY){
 	this.yStart = posY || 80;
 	this.xSpeed = 0.07;
 	this.ySpeed = 0.005;
+	this.xDelta = 0;
+	this.yDelta = 0;
 	this.img.src = kmBomber.imagePath + kmBomber.images.plane;
 	this.nrOfBombs = 40;
 	this.init(1, posX, posY);
@@ -447,9 +431,18 @@ Plane.prototype ={
 	    	this.status = "landed";
 	    	kmBomber.log("plane landed");
 	    } else {
-		    this.x += this.xSpeed * (timeDelta || 0);
-		    this.y += this.ySpeed * (timeDelta || 0);
+	    	this.xDelta = this.xSpeed * (timeDelta || 0)
+	    	this.yDelta = this.ySpeed * (timeDelta || 0)
+		    this.x += this.xDelta;
+		    this.y += this.yDelta;
 		}
+	},
+	draw: function(){
+    	this.clear();
+	    kmBomber.context.drawImage(this.img, this.x, this.y);
+	},
+	clear: function(){
+		kmBomber.context.clearRect(this.x - this.xDelta, this.y - this.yDelta, this.img.width + this.xDelta, this.img.height + this.yDelta);
 	},
 	tryBombDrop: function(bombs){
 		var curTimeStamp = Math.floor(Date.now() / 100);
@@ -509,6 +502,7 @@ function Bomb(xPos, yPos, ID){
 	this.x = this.buildingNr * 30 + 6;
 	this.y = yPos;
 	this.ySpeed = 0.08;
+	this.delta = 0;
 	this.active = true;
 	this.size = 1;//small bomb
 	this.impact = Math.floor(Math.random() * 3) + this.size + 1; //#of floors it damages
@@ -520,8 +514,9 @@ function Bomb(xPos, yPos, ID){
 Bomb.prototype = {
 	move: function(timeDelta, canvas){
 		if (!this.active) return false;
+		this.delta = this.ySpeed * (timeDelta || 0)
 	    if ((this.y + this.img.height) <= canvas.height){
-		    this.y += this.ySpeed * (timeDelta || 0);
+		    this.y += this.delta;
 	    	return true;
 	    }
 	    else {
@@ -529,12 +524,15 @@ Bomb.prototype = {
 	    	return false;
 	    }
 	},
-	draw: function(ctx){
+	draw: function(){
 		if (!this.active) return;
-		ctx.drawImage(this.img, this.x, this.y);
+		kmBomber.context.clearRect(this.x, this.y - this.delta, this.img.width, this.img.height + this.delta);
+		kmBomber.context.drawImage(this.img, this.x, this.y);
 	},
 	remove: function(){
 		this.active = false;
+		kmBomber.context.clearRect(this.x, this.y - this.delta, this.img.width, this.img.height + this.delta);
+		
 	},
 	hasCollided: function(building){
 		if (!!building){
@@ -572,7 +570,8 @@ Building.prototype ={
 			broken: broken
 		};
 	},
-	draw: function(ctx){
+	draw: function(){
+		var ctx = kmBomber.context;
 		var img = this.img();
 		if (this.floors > 0){
 			ctx.drawImage(img.base, this.x, this.y-4);
@@ -592,13 +591,13 @@ Building.prototype ={
 		} else {
 			this.top+= 3;
 		}
+
 	},
 	getFloors: function(){
 		var canvasWidth = document.getElementById('canvas').width,
 			divider = (canvasWidth / 2) / this.maxFloors,
 			maxFloors = this.maxFloors - Math.floor(Math.abs((this.x - canvasWidth/2) / divider)),
 			minFloors = Math.floor(this.maxFloors / 6) + (kmBomber.level - 1);
-
 
 		return Math.floor(Math.random() * maxFloors + minFloors);
 	},
@@ -627,25 +626,34 @@ Building.prototype ={
 				bomb.remove();
 			}
 		}
+		//redraw building
+		kmBomber.context.clearRect(this.x, this.initialTop, this.img().base.width, canvas.height - this.initialTop);
+		this.draw();
 	}
 };
 
 
-function getBuildings(level)
+function Buildings()
 {
-	var buildings = [],
-		maxHeight,
-		maxWidth,
-		canvas = kmBomber.canvas;
-
-	maxWidth = canvas.width;
-	for (var indx = 0; indx < 20; indx++){
-		buildings[indx] = new Building(30 * indx, 400, 1);
-	}
-
-	return buildings;
-	//return [new Building(0,400,1)];
+	this.building = [];
+	this.init();
 }
+
+Buildings.prototype = {
+	init: function(){
+		this.maxWidth = kmBomber.canvas.width;
+		for (var indx = 0; indx < 20; indx++){
+			this.building[indx] = new Building(30 * indx, 400, 1);
+		}
+	},
+	draw: function(){
+	    for (var indx = 0; indx < this.building.length; indx++){
+	    	this.building[indx].draw();
+	    	this.building[indx].initialTop = this.building[indx].top;
+	    }
+	}
+};
+
 
 kmBomber.Sounds = function(track){
 	var sound = new Audio(kmBomber.soundPath + kmBomber.tracks[track]);
@@ -685,7 +693,7 @@ Timer.prototype = {
 	display: function(fps){
 		kmBomber.context.clearRect(2, 2, 50, 50);
 		kmBomber.context.fillText(fps, 2, 10);
-	}
+}
 };
 
 kmBomber.imgLoader = function(imagePath, images, callback){
@@ -792,7 +800,6 @@ document.addEventListener("DOMContentLoaded", function(event)
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.oRequestAnimationFrame;
 	window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 	window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
-	//var intervalID = window.setInterval("kmBomber.setSun()", 1000);
 	kmBomber.soundLoader(kmBomber.soundPath, kmBomber.tracks, function (){
 		kmBomber.imgLoader(kmBomber.imagePath, kmBomber.images, function (){
 			kmBomber.init();

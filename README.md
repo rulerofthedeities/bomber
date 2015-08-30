@@ -1,15 +1,15 @@
 # km-Bomber
 Old school bomber game in JS
 
-##installation
+##Installation
 Download the ZIP file in https://github.com/rulerofthedeities/bomber/releases and expand its contents into a folder.
 Launch the bomber.htm file in a browser.
 
-##requirements
+##Requirements
 You'll need a html5-compliant browser to run the game.
 The latest versions of Chrome, Firefox, Opera and Yandex are all compliant.
 
-##instructions
+##Instructions
 Press space to drop a bomb.
 Destroy all buildings to complete a level.
 
