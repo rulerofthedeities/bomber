@@ -1,8 +1,8 @@
 'use strict';
     
 var kmBomber = {
-	isDebug: true,
-	version: "1.1.0",
+	isDebug: false,
+	version: "1.1.1",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -43,11 +43,8 @@ kmBomber.init = function() {
 	kmBomber.log("km-Bomber version " + kmBomber.version);
     kmBomber.canvas = document.getElementById("canvas");
 	kmBomber.context = kmBomber.canvas.getContext("2d");
-	kmBomber.objects = {
-		plane: new Plane(kmBomber.planeStart.x, kmBomber.planeStart.y),
-		buildings: new Buildings(),
-		bombs : []
-	};
+	kmBomber.plane = new Plane(kmBomber.planeStart.x, kmBomber.planeStart.y);
+	kmBomber.buildings = new Buildings();
 	kmBomber.hud = new HUD();
 	kmBomber.timer = new Timer();
 	kmBomber.player = new Player();
@@ -63,8 +60,7 @@ kmBomber.startMenu = function(callback){
 	var menuPlane = new Plane(-102, 40);
 	menuPlane.ySpeed = 0;
 	menuPlane.y = 20;
-	kmBomber.plane = menuPlane;
-	kmBomber.runMenu();
+	kmBomber.runMenu(menuPlane);
 
 	document.getElementById("start").addEventListener("click", function(e){
 		e.preventDefault();
@@ -90,18 +86,18 @@ kmBomber.startMenu = function(callback){
 	});
 };
 
-kmBomber.runMenu = function() {
+kmBomber.runMenu = function(plane) {
     var now = new Date().getTime(),
         dt = now - (kmBomber.time || now);
  
     kmBomber.time = now;
-    kmBomber.plane.move(dt, kmBomber.canvas);
+	plane.move(dt, kmBomber.canvas);
 	if (kmBomber.started !== true)
 	{
-		kmBomber.plane.draw();
-    	requestAnimationFrame(kmBomber.runMenu);
+		plane.draw();
+    	requestAnimationFrame(function(timestamp){kmBomber.runMenu(plane);});
 	} else {
-		kmBomber.plane.clear();
+		plane.clear();
 	}
 };
 
@@ -152,7 +148,7 @@ kmBomber.start = function(){
 	kmBomber.started = true;
 	kmBomber.hud.init();
 	kmBomber.hud.updateLabels();
-	kmBomber.objects.buildings.draw();
+	kmBomber.buildings.draw();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 
@@ -169,14 +165,13 @@ kmBomber.restart = function(){
 
 kmBomber.startLevel = function(level){
 	kmBomber.context.clearRect(0, kmBomber.planeStart.y, canvas.width, canvas.height);
-	kmBomber.objects.plane.init(level, kmBomber.planeStart.x, kmBomber.planeStart.y);
+	kmBomber.plane.init(kmBomber.planeStart.x, kmBomber.planeStart.y);
 	kmBomber.hud.init();
 	kmBomber.canvas.setAttribute('tabindex','0');
 	kmBomber.canvas.focus();
 	kmBomber.player.isPromoted = false;
-	kmBomber.objects.buildings = new Buildings();
-	kmBomber.objects.bombs = [];
-	kmBomber.objects.buildings.draw();
+	kmBomber.buildings = new Buildings();
+	kmBomber.buildings.draw();
 	kmBomber.time = null;
 
 	
@@ -187,11 +182,13 @@ kmBomber.run = function() {
 		
     var now = new Date().getTime(),
         dt = now - (kmBomber.time || now),
-		plane = kmBomber.objects.plane,
-		bombs = kmBomber.objects.bombs,
-    	buildings = kmBomber.objects.buildings,
+		plane = kmBomber.plane,
+		bombs = plane.bombs,
+    	buildings = kmBomber.buildings.building,
+    	player = kmBomber.player,
     	canvas = kmBomber.canvas,
     	context = kmBomber.context,
+
     	indx;
  
     kmBomber.time = now;
@@ -205,19 +202,19 @@ kmBomber.run = function() {
 
 	//move plane
 	plane.move(dt, canvas);
-	if (plane.hasCollided(buildings.building)){
+	if (plane.hasCollided(buildings)){
 		kmBomber.log("plane crashed");
 		plane.status = "crashed";
-		kmBomber.player.gameOver();
+		player.gameOver();
 		return;
 	}
-	kmBomber.player.update(kmBomber.objects);//check if player presses keys
+	player.update(kmBomber.plane);//check if player presses keys
     
 	//move bombs
 	for (indx = 0; indx < bombs.length; indx++){
 		if (bombs[indx].move(dt, canvas)){
-			if (bombs[indx].hasCollided(buildings.building[bombs[indx].buildingNr])){
-				buildings.building[bombs[indx].buildingNr].hit(bombs[indx]);
+			if (bombs[indx].hasCollided(buildings[bombs[indx].buildingNr])){
+				buildings[bombs[indx].buildingNr].hit(bombs[indx]);
 			}
 		}
 	}
@@ -230,7 +227,7 @@ kmBomber.run = function() {
 			}
 		    requestAnimationFrame(kmBomber.run);
 		} else {
-			kmBomber.player.levelUp();
+			player.levelUp();
 			return;
 	    }
 	}
@@ -247,9 +244,9 @@ function Player(){
 }
 
 Player.prototype = {
-	update: function(obj) {
+	update: function(plane) {
 		if (Key.isDown(Key.SPACE)){
-			obj.plane.tryBombDrop(obj.bombs);
+			plane.tryBombDrop(plane.bombs);
 		}
 	},
 	load: function(){
@@ -347,7 +344,7 @@ function HUD(){
 
 HUD.prototype = {
 	init: function(){
-		this.updateBombs(kmBomber.objects.plane);
+		this.updateBombs(kmBomber.plane);
 		this.updateScore(kmBomber.player);
 		this.updatePlayer(kmBomber.player);
 		this.updateRank(kmBomber.player);
@@ -411,17 +408,18 @@ function Plane(posX, posY){
 	this.yDelta = 0;
 	this.img.src = kmBomber.imagePath + kmBomber.images.plane;
 	this.nrOfBombs = 40;
-	this.init(1, posX, posY);
+	this.init(posX, posY);
 }
 
 Plane.prototype ={
-	init: function(level, posX, posY){
+	init: function(posX, posY){
 		this.lastTimeBombDropped = 0;
 		this.nrOfBombsDropped = 0;
 		this.nrOfBombsLeft = this.nrOfBombs;
 		this.x = posX;
 		this.y = posY;
 		this.status = "airborne";
+		this.bombs = [];
 	},
 	move: function(timeDelta, canvas){
 	    if (this.x > canvas.width) {
