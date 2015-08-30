@@ -1,7 +1,7 @@
-
+'use strict';
 var kmBomber = {
 	isDebug: true,
-	version: "1.0.1",
+	version: "1.0.2",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -134,9 +134,9 @@ kmBomber.levelMenu = function(status, callback){
 		document.getElementById("congratsLevel").style.display = "block";
 	}
 	document.getElementById("levelMenu").style.display = "block";
-	document.getElementById("nxtLevel").addEventListener("click", function(e){
+	document.getElementById("nxtLevel").addEventListener("click", function btnClick(e){
 		e.preventDefault();
-		document.getElementById("nxtLevel").removeEventListener(e.type, arguments.callee);
+		document.getElementById("nxtLevel").removeEventListener(e.type, btnClick);
 		document.getElementById("levelMenu").style.display = "none";
 		document.getElementById("gameOver").style.display = "none";
 	    document.getElementById("sky").style.opacity = "1.0";
@@ -155,7 +155,7 @@ kmBomber.start = function(){
 	kmBomber.log("game starts");
 	kmBomber.started = true;
 
-	kmBomber.run(Date.now, Date.now);
+	kmBomber.run();
 };
 
 kmBomber.restart = function(){
@@ -172,18 +172,23 @@ kmBomber.startLevel = function(level){
 	kmBomber.player.isPromoted = false;
 	kmBomber.objects.buildings = getBuildings(level);
 	kmBomber.objects.bombs = [];
+	kmBomber.time = null;
 	
-	kmBomber.run(Date.now, Date.now);
-	
+	kmBomber.run();
 };
 
-kmBomber.run = function(nowTime, lastTime) {
+kmBomber.run = function() {
 		
-	plane = kmBomber.objects.plane;
-	bombs = kmBomber.objects.bombs;
-    buildings = kmBomber.objects.buildings;
-    canvas = kmBomber.canvas;
-    context = kmBomber.context;
+    var now = new Date().getTime(),
+        dt = now - (kmBomber.time || now),
+		plane = kmBomber.objects.plane,
+		bombs = kmBomber.objects.bombs,
+    	buildings = kmBomber.objects.buildings,
+    	canvas = kmBomber.canvas,
+    	context = kmBomber.context,
+    	indx;
+ 
+    kmBomber.time = now;
 
     //show FPS
     if (!!kmBomber.isDebug)
@@ -193,7 +198,7 @@ kmBomber.run = function(nowTime, lastTime) {
 	}
 
 	//move plane
-	plane.move(nowTime - lastTime, canvas);
+	plane.move(dt, canvas);
 	if (plane.hasCollided(buildings)){
 		kmBomber.log("plane crashed");
 		plane.status = "crashed";
@@ -204,7 +209,7 @@ kmBomber.run = function(nowTime, lastTime) {
     
 	//move bombs
 	for (indx = 0; indx < bombs.length; indx++){
-		if (bombs[indx].move(nowTime - lastTime, canvas)){
+		if (bombs[indx].move(dt, canvas)){
 			if (bombs[indx].hasCollided(buildings[bombs[indx].buildingNr])){
 				buildings[bombs[indx].buildingNr].hit(bombs[indx]);
 			}
@@ -226,12 +231,8 @@ kmBomber.run = function(nowTime, lastTime) {
 			for (indx = 0; indx < bombs.length; indx++){
 				bombs[indx].draw(context);
 			}
-		    requestAnimationFrame(
-		        function(timestamp){
-		        	kmBomber.run(timestamp, nowTime);
-		        }
-		    );
-	    } else {
+		    requestAnimationFrame(kmBomber.run);
+		} else {
 			kmBomber.player.levelUp();
 			return;
 	    }
@@ -341,7 +342,7 @@ Player.prototype = {
 	completedGame: function(){
 		kmBomber.log("game completed");
 	    this.save();
-
+		this.hiScore = this.getHiScore();
 
 		kmBomber.levelMenu("gamecomplete", function(){
 			kmBomber.log('Restart');
@@ -404,7 +405,7 @@ HUD.prototype = {
 	updateRank: function(player){
 		var txt = "Rank: " + kmBomber.ranks[player.rank];
 		this.context.font = "14px Verdana";
-		this.context.clearRect(0, this.scoreRange.y + 30, 300, 100);
+		this.context.clearRect(0, this.scoreRange.y + 30, 400, 100);
 		this.context.fillText(txt, 82, this.scoreRange.y + 30);
 		
 		var rank = kmBomber.ranks[kmBomber.player.rank].toLowerCase();
@@ -465,10 +466,10 @@ Plane.prototype ={
 	dropBomb: function (bombs){
 		this.nrOfBombsLeft--;
 		this.nrOfBombsDropped++;
-			this.lastTimeBombDropped = Math.floor(Date.now() / 100);
-			var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5, bombs.length);
-			bombs.push(bomb);
-			kmBomber.hud.updateBombs(this);
+		this.lastTimeBombDropped = Math.floor(Date.now() / 100);
+		var bomb = new Bomb(this.x + this.img.width / 2, this.y + this.img.height + 5, bombs.length);
+		bombs.push(bomb);
+		kmBomber.hud.updateBombs(this);
 	},
 	hasCollided: function(buildings){
 		var noseX = Math.floor(this.x) + this.img.width,
@@ -478,7 +479,7 @@ Plane.prototype ={
 			building = buildings[Math.floor(noseX / 30)];
 		//Check plane nose
 		if (building){
-			if (building.floors > 0 && noseY > building.top){
+			if (!building.isDestroyed && noseY > building.top){
 				this.hit();
 				return true;
 			}
@@ -486,7 +487,7 @@ Plane.prototype ={
 		//Check plane belly
 		building = buildings[Math.floor(bellyX / 30)];
 		if (building){
-			if (building.floors > 0 && bellyY > building.top){
+			if (!building.isDestroyed && bellyY > building.top){
 				this.hit();
 				return true;
 			}
@@ -507,6 +508,7 @@ function Bomb(xPos, yPos, ID){
 	this.buildingNr = Math.floor(xPos / 30);
 	this.x = this.buildingNr * 30 + 6;
 	this.y = yPos;
+	this.ySpeed = 0.08;
 	this.active = true;
 	this.size = 1;//small bomb
 	this.impact = Math.floor(Math.random() * 3) + this.size + 1; //#of floors it damages
@@ -519,7 +521,7 @@ Bomb.prototype = {
 	move: function(timeDelta, canvas){
 		if (!this.active) return false;
 	    if ((this.y + this.img.height) <= canvas.height){
-	    	this.y++;
+		    this.y += this.ySpeed * (timeDelta || 0);
 	    	return true;
 	    }
 	    else {
@@ -554,13 +556,13 @@ function Building(xPos, yPos, nr){
 
 Building.prototype ={
 	img: function() {
-		base = new Image();
+		var base = new Image(),
+			shaft = new Image(),
+			capital = new Image(),
+			broken = new Image();
 		base.src = kmBomber.imagePath + kmBomber.images.building["_" + this.nr].base;
-		shaft = new Image();
 		shaft.src = kmBomber.imagePath + kmBomber.images.building["_" + this.nr].shaft;
-		capital = new Image();
 		capital.src = kmBomber.imagePath + kmBomber.images.building["_" + this.nr].capital;
-		broken = new Image();
 		broken.src = kmBomber.imagePath + kmBomber.images.building["_" + this.nr].broken;
 
 		return {
@@ -681,8 +683,8 @@ Timer.prototype = {
 		return Math.round(1 / this.elapsed);
 	},
 	display: function(fps){
-		context.clearRect(2, 2, 50, 50);
-		context.fillText(fps, 2, 10);
+		kmBomber.context.clearRect(2, 2, 50, 50);
+		kmBomber.context.fillText(fps, 2, 10);
 	}
 };
 

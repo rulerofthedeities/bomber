@@ -2,7 +2,7 @@
 Old school bomber game in JS
 
 ##installation
-Download the ZIP file and expand its contents into a folder.
+Download the ZIP file in https://github.com/rulerofthedeities/bomber/releases and expand its contents into a folder.
 Launch the bomber.htm file in a browser.
 
 ##requirements
