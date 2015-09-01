@@ -2,7 +2,7 @@
     
 var kmBomber = {
 	isDebug: true,
-	version: "1.1.2",
+	version: "1.1.3",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -35,7 +35,7 @@ var kmBomber = {
 	},
 	ranks: ["Airman", "Sergeant", "Lieutenant", "Captain", "Major", "Colonel", "General"],
 	time: null,
-	level: 1,
+	level: 4,
 	maxLevels: 5,
 	planeStart: {x:-120, y:82}
 };
@@ -211,28 +211,28 @@ kmBomber.run = function() {
 	}
 	player.update(kmBomber.plane);//check if player presses keys
     
-	//move bombs & missiles
-	for (indx = 0; indx < bombs.length; indx++){
-		if (bombs[indx].move(dt, canvas)){
-			if (bombs[indx].hasCollided(buildings[bombs[indx].buildingNr])){
-				buildings[bombs[indx].buildingNr].hit(bombs[indx]);
-			}
-		}
-	}
-	for (indx = 0; indx < missiles.length; indx++){
-		if (missiles[indx].move(dt, canvas)){
-			if (missiles[indx].hasCollided()){
-				;
-			}
-		}
-	}
+	
 
     if (plane.status !== "crashed"){
     	plane.draw();
 	    if (plane.status !== "landed"){
+
+			//move bombs & missiles
 			for (indx = 0; indx < bombs.length; indx++){
-				bombs[indx].draw();
+				if (bombs[indx].move(dt, canvas)){
+					bombs[indx].draw();
+					if (bombs[indx].hasCollided(buildings[bombs[indx].buildingNr])){
+						buildings[bombs[indx].buildingNr].hitByBomb(bombs[indx]);
+					}
+				}
 			}
+			for (indx = 0; indx < missiles.length; indx++){
+				if (missiles[indx].move(dt, canvas)){
+					missiles[indx].draw();
+					missiles[indx].checkCollision();
+				}
+			}
+
 		    requestAnimationFrame(kmBomber.run);
 		} else {
 			player.levelUp();
@@ -475,7 +475,7 @@ Plane.prototype ={
 	tryBombDrop: function(){
 		var curTimeStamp = Math.floor(Date.now() / 100);
 		//Check if plane in frame
-		if (this.isInFrame()){
+		if (this.isInFrame("bomb")){
 			//check if bomb has been loaded
 			if(this.nrOfBombsLeft > 0 && curTimeStamp - this.lastTimeBombDropped > 6){
 				this.dropBomb();
@@ -493,7 +493,7 @@ Plane.prototype ={
 	tryMissileLaunch: function(){
 		var curTimeStamp = Math.floor(Date.now() / 100);
 		//Check if plane in frame
-		if (this.isInFrame()){
+		if (this.isInFrame("missile")){
 			//check if missile has been loaded
 			if(this.nrOfMissilesLeft > 0 && curTimeStamp - this.lastTimeMissileLaunched > 10){
 				this.launchMissile();
@@ -504,9 +504,8 @@ Plane.prototype ={
 		this.nrOfMissilesLeft--;
 		this.nrOfMissilesLaunched++;
 		this.lastTimeMissileLaunched = Math.floor(Date.now() / 100);
-		var missile = new Missile(this.x + this.img.width +2, this.y +3, this.missiles.length, this);
+		var missile = new Missile(this.x + this.img.width + 1, this.y + this.img.height, this.missiles.length);
 		missile.sound.play();
-		//missile.sound.pause();
 		this.missiles.push(missile);
 		kmBomber.hud.updateMissiles(this);
 		kmBomber.log("launch missile");
@@ -515,7 +514,7 @@ Plane.prototype ={
 		var noseX = Math.floor(this.x) + this.img.width,
 			noseY = Math.floor(this.y) + this.img.height - 6,
 			bellyX = Math.floor(this.x + this.img.width / 2),
-			bellyY = Math.floor(this.y) + this.img.height,
+			bellyY = Math.floor(this.y) + this.img.height + 1,
 			building = buildings[Math.floor(noseX / 30)];
 		//Check plane nose
 		if (building){
@@ -537,8 +536,9 @@ Plane.prototype ={
 	hasLanded: function(){
 		return (this.status === "landed");
 	},
-	isInFrame: function(){
-		return this.x > -this.img.width / 2 && (this.x + this.img.width / 2) < canvas.width;
+	isInFrame: function(tpe){
+		var offset = tpe === "bomb" ? this.img.width / 2 : this.img.width;
+		return this.x > -offset && (this.x + offset) < kmBomber.canvas.width;
 	},
 	hit: function(){
 		kmBomber.Sounds("explosion").play();
@@ -592,11 +592,11 @@ Bomb.prototype = {
 };
 
 
-function Missile(xPos, yPos, ID, plane){
+function Missile(xPos, yPos, ID){
 	this.id = ID;
-	this.x = plane.x + 1;
-	this.y = plane.y;
-	this.ySpeed = 0.12;
+	this.x = xPos;
+	this.y = yPos;
+	this.xSpeed = 0.16;
 	this.delta = 0;
 	this.active = true;
 	this.size = 1;
@@ -608,14 +608,14 @@ function Missile(xPos, yPos, ID, plane){
 Missile.prototype = {
 	move: function(timeDelta, canvas){
 		if (!this.active) return false;
-		this.delta = this.ySpeed * (timeDelta || 0);
+		this.delta = this.xSpeed * (timeDelta || 0);
 	    if (this.x > canvas.width){
 	    	this.remove();
 	    	return false;
 	    }
 	    else {
-	    	this.remove();
-	    	return false;
+	    	this.x += this.delta;
+	    	return true;
 	    }
 	},
 	draw: function(){
@@ -628,11 +628,13 @@ Missile.prototype = {
 		this.clear();
 	},
 	clear: function(){
-		kmBomber.context.clearRect(this.x + this.img.width, this.y, this.x + this.img.width + this.delta, this.img.height);
+		kmBomber.context.clearRect(this.x - this.delta, this.y, this.img.width + this.delta, this.img.height);
 	},
-	hasCollided: function(building){
-		if (!!building){
-			return this.y + this.img.height >= building.top;
+	checkCollision: function(){
+		var buildingNr = Math.floor((this.x + this.img.width + 1) / 30);
+		var building = kmBomber.buildings.building[buildingNr];
+		if (!!building && this.y + this.img.height + 1 >= building.top){
+			 building.hitByMissile(this);
 		}
 	}
 };
@@ -689,7 +691,7 @@ Building.prototype ={
 
 		return Math.floor(Math.random() * topFloor + lowFloor);
 	},
-	hit: function(bomb){
+	hitByBomb: function(bomb){
 		if (this.toDestroy > 0){
 			kmBomber.Sounds("explosion").play();
 		}
@@ -715,8 +717,27 @@ Building.prototype ={
 			}
 		}
 		//redraw building
-		kmBomber.context.clearRect(this.x, this.initialTop, this.img().base.width, kmBomber.canvas.height - this.initialTop);
+		this.clear();
 		this.draw();
+	},
+	hitByMissile: function(missile){
+		kmBomber.Sounds("explosion").play();
+		missile.sound.pause();
+		var nrOfFloorsToDestroy = Math.round(((missile.y + missile.img.height + 2) - this.top) / this.imgs.shaft.height) + 1;
+		this.floors = this.floors < nrOfFloorsToDestroy ? 0 : this.floors - nrOfFloorsToDestroy;
+		this.isIntact = false;
+		missile.impact--;
+
+		kmBomber.player.score += nrOfFloorsToDestroy * 8;
+		kmBomber.hud.updateScore(kmBomber.player);
+		if (missile.impact < 1){
+			missile.remove();
+		}
+		this.clear();
+		this.draw();
+	},
+	clear: function(){
+		kmBomber.context.clearRect(this.x, this.initialTop, this.imgs.base.width, kmBomber.canvas.height - this.initialTop);
 	}
 };
 
