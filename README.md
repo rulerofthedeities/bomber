@@ -11,6 +11,7 @@ The latest versions of Chrome, Firefox, Opera and Yandex are all compliant.
 
 ##Instructions
 Press space to drop a bomb.
+Press enter to launch a missile.
 Destroy all buildings to complete a level.
 
 ##Screenshot
