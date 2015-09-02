@@ -23,7 +23,7 @@ body{
 	opacity: 0.8;
 	box-shadow: 0 0 80px 40px hsla(7,88%,70%,0.4);
 }
-#hud{
+#hud, #buildings{
 	position:absolute;
 	top:0;
 	left:0;

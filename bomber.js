@@ -2,7 +2,7 @@
     
 var kmBomber = {
 	isDebug: true,
-	version: "1.2.0",
+	version: "1.2.1",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -232,7 +232,7 @@ kmBomber.run = function() {
 				}
 			}
 		    for (indx = 0; indx < buildings.length; indx++){
-		    	buildings[indx].checkRefresh();
+		    	//buildings[indx].checkRefresh();
 		    }
 		    requestAnimationFrame(kmBomber.run);
 		} else {
@@ -471,7 +471,7 @@ Plane.prototype ={
 	    kmBomber.context.drawImage(this.img, this.x, this.y);
 	},
 	clear: function(){
-		kmBomber.context.clearRect(this.x - this.xDelta, this.y - this.yDelta, this.img.width + this.xDelta, this.img.height + this.yDelta);
+		kmBomber.context.clearRect(this.x - this.xDelta, this.y - this.yDelta - 1, this.img.width + this.xDelta, this.img.height + this.yDelta + 1);
 	},
 	tryBombDrop: function(){
 		var curTimeStamp = Math.floor(Date.now() / 100);
@@ -578,7 +578,7 @@ Bomb.prototype = {
 		kmBomber.context.drawImage(this.img, this.x, this.y);
 	},
 	clear: function(){
-		kmBomber.context.clearRect(this.x, this.y - this.delta - 1, this.img.width, this.img.height + this.delta);
+		kmBomber.context.clearRect(this.x, this.y - this.delta - 1, this.img.width, this.img.height + this.delta + 1);
 	},
 	remove: function(){
 		this.active = false;
@@ -639,7 +639,8 @@ Missile.prototype = {
 	}
 };
 
-function Building(xPos, yPos, maxFloors, nr){
+function Building(ctx, xPos, yPos, maxFloors, nr){
+	this.ctx = ctx;
 	this.x = xPos;
 	this.y = yPos;
 	this.nr = nr;
@@ -663,7 +664,7 @@ Building.prototype ={
 		};
 	},
 	draw: function(){
-		var ctx = kmBomber.context;
+		var ctx = this.ctx;
 		this.prevTop = this.top;
 		if (this.floors > 0){
 			ctx.drawImage(this.imgs.base, this.x, this.y-4);
@@ -746,17 +747,19 @@ Building.prototype ={
 		}
 	},
 	clear: function(){
-		kmBomber.context.clearRect(this.x, this.prevTop, this.imgs.base.width, kmBomber.canvas.height - this.prevTop);
+		this.ctx.clearRect(this.x, this.prevTop, this.imgs.base.width, kmBomber.buildings.canvas.height - this.prevTop);
 	}
 };
 
 
 function Buildings()
 {
+    this.canvas = document.getElementById("buildings");
+	this.context = this.canvas.getContext("2d");
 	this.building = [];
 	this.nrOfBuildings = 20;
-	this.buildingWidth = kmBomber.canvas.width / this.nrOfBuildings;
-	this.buildingBase = kmBomber.canvas.height;
+	this.buildingWidth = this.canvas.width / this.nrOfBuildings;
+	this.buildingBase = this.canvas.height;
 	this.maxFloors = 7 + kmBomber.level;
 	this.init();
 }
@@ -764,11 +767,11 @@ function Buildings()
 Buildings.prototype = {
 	init: function(){   
 		for (var indx = 0; indx < this.nrOfBuildings; indx++){
-			this.building[indx] = new Building(this.buildingWidth * indx, this.buildingBase, this.maxFloors, 1);
+			this.building[indx] = new Building(this.context, this.buildingWidth * indx, this.buildingBase, this.maxFloors, 1);
 		}
 	},
 	draw: function(){
-		kmBomber.context.clearRect(0, 0, kmBomber.canvas.width, kmBomber.canvas.height);
+		this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
 		for (var indx = 0; indx < this.building.length; indx++){
 	    	this.building[indx].draw();
