@@ -1,8 +1,8 @@
 'use strict';
     
 var kmBomber = {
-	isDebug: true,
-	version: "1.2.1",
+	isDebug: false,
+	version: "1.2.2",
 	imagePath: "assets/img/",
 	images: {
 		plane : "bomber.png",
@@ -231,9 +231,6 @@ kmBomber.run = function() {
 					missiles[indx].checkCollision();
 				}
 			}
-		    for (indx = 0; indx < buildings.length; indx++){
-		    	//buildings[indx].checkRefresh();
-		    }
 		    requestAnimationFrame(kmBomber.run);
 		} else {
 			player.levelUp();
@@ -310,8 +307,8 @@ Player.prototype = {
 	},
 	checkPromotion: function(){
 		this.isPromoted = false;
-		if (this.rank + 1 < kmBomber.level){
-			this.rank = kmBomber.level - 1;
+		if (this.rank === 0 || this.rank + 1 < kmBomber.level){
+			this.rank++;
 			this.isPromoted = true;
 		} else {
 			if (kmBomber.level === kmBomber.maxLevels && this.rank < kmBomber.ranks.length - 1){
@@ -738,13 +735,6 @@ Building.prototype ={
 		}
 		this.clear();
 		this.draw();
-	},
-	checkRefresh: function(){
-		//redraw if the top is lower than the plane + missile
-		if (this.top <= kmBomber.plane.y + kmBomber.plane.img.height + 6){
-			this.draw();
-			kmBomber.plane.draw();
-		}
 	},
 	clear: function(){
 		this.ctx.clearRect(this.x, this.prevTop, this.imgs.base.width, kmBomber.buildings.canvas.height - this.prevTop);
